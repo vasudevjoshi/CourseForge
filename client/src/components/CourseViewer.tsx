@@ -97,7 +97,7 @@ export const CourseViewer: React.FC<CourseViewerProps> = ({
             id="start-over-btn"
             style={{ flexShrink: 0, fontSize: '0.82rem', padding: '0.4rem 0.9rem' }}
           >
-            ← New Course
+            ← Sign out
           </button>
         </div>
 
