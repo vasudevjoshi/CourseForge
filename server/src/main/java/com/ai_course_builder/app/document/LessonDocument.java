@@ -29,7 +29,7 @@ public class LessonDocument {
     private YoutubeVideo video;
     private List<QuizQuestion> quiz;
 
-    private List<String> practiceQuestions = new ArrayList<>();
+    private List<String> practiceQuestionIds = new ArrayList<>();
 
 
 }
