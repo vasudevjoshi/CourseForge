@@ -1,8 +1,8 @@
-import { useCourseGeneration } from './hooks/useCourseGeneration';
-import { TopicInput } from './components/TopicInput';
+import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { CourseViewer } from './components/CourseViewer';
 import { GenerationProgress } from './components/GenerationProgress';
-import { useEffect, useState, type FormEvent } from 'react';
+import { TopicInput } from './components/TopicInput';
+import { useCourseGeneration } from './hooks/useCourseGeneration';
 
 const WORKFLOW_STEPS = [
   {
@@ -40,6 +40,14 @@ const BENEFITS = [
 
 const AUTH_STORAGE_KEY = 'ai-course-builder.auth';
 
+const ROUTES = {
+  HOME: '/',
+  LOGIN: '/login',
+  SIGNUP: '/signup',
+  BUILD: '/build',
+} as const;
+
+type AppRoute = (typeof ROUTES)[keyof typeof ROUTES];
 type AuthMode = 'login' | 'signup';
 
 type AuthProfile = {
@@ -48,8 +56,24 @@ type AuthProfile = {
   provider: 'email' | 'google';
 };
 
-function AuthPage({ onAuth }: { onAuth: (profile: AuthProfile) => void }) {
-  const [mode, setMode] = useState<AuthMode>('login');
+function normalizeRoute(pathname: string): AppRoute {
+  if (pathname.startsWith(ROUTES.LOGIN)) return ROUTES.LOGIN;
+  if (pathname.startsWith(ROUTES.SIGNUP)) return ROUTES.SIGNUP;
+  if (pathname.startsWith(ROUTES.BUILD)) return ROUTES.BUILD;
+  return ROUTES.HOME;
+}
+
+function AuthPage({
+  mode,
+  onAuth,
+  onGoHome,
+  onGoOtherPage,
+}: {
+  mode: AuthMode;
+  onAuth: (profile: AuthProfile) => void;
+  onGoHome: () => void;
+  onGoOtherPage: () => void;
+}) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -83,29 +107,25 @@ function AuthPage({ onAuth }: { onAuth: (profile: AuthProfile) => void }) {
   return (
     <main className="auth-shell">
       <section className="auth-panel animate-fade-in-up">
-        <div className="auth-brand">
-          <div className="home-kicker">AI course builder</div>
-          <h1 className="auth-title">Sign in to build your learning path.</h1>
-          <p className="auth-copy">
-            Use email login, create a new account, or continue with Google. This version runs fully in the frontend and stores your session locally.
-          </p>
+        <div className="page-actions" style={{ justifyContent: 'space-between', marginBottom: '1rem' }}>
+          <button type="button" className="btn-ghost" onClick={onGoHome}>
+            ← Home
+          </button>
+          <button type="button" className="btn-ghost" onClick={onGoOtherPage}>
+            {mode === 'login' ? 'Go to Sign up' : 'Go to Login'}
+          </button>
         </div>
 
-        <div className="auth-tabs" role="tablist" aria-label="Authentication modes">
-          <button
-            type="button"
-            className={`auth-tab${mode === 'login' ? ' auth-tab--active' : ''}`}
-            onClick={() => setMode('login')}
-          >
-            Login
-          </button>
-          <button
-            type="button"
-            className={`auth-tab${mode === 'signup' ? ' auth-tab--active' : ''}`}
-            onClick={() => setMode('signup')}
-          >
-            Sign up
-          </button>
+        <div className="auth-brand">
+          <div className="home-kicker">AI course builder</div>
+          <h1 className="auth-title">
+            {mode === 'login' ? 'Sign in to continue your course.' : 'Create your account to begin.'}
+          </h1>
+          <p className="auth-copy">
+            {mode === 'login'
+              ? 'Use email login or continue with Google to pick up where you left off.'
+              : 'Create a local account or continue with Google to start learning faster.'}
+          </p>
         </div>
 
         <button type="button" className="google-auth-btn" onClick={handleGoogleAuth}>
@@ -162,8 +182,8 @@ function AuthPage({ onAuth }: { onAuth: (profile: AuthProfile) => void }) {
 
         <p className="auth-footnote">
           {mode === 'login'
-            ? 'New here? Switch to Sign up to create a local session.'
-            : 'Already have an account? Switch to Login to continue.'}
+            ? 'New here? Use the button above to go to Sign up.'
+            : 'Already have an account? Use the button above to go to Login.'}
         </p>
       </section>
     </main>
@@ -171,47 +191,64 @@ function AuthPage({ onAuth }: { onAuth: (profile: AuthProfile) => void }) {
 }
 
 function HomePage({
-  onSubmit,
-  status,
-  error,
   profile,
+  onGoToBuild,
+  onGoToLogin,
+  onGoToSignup,
   onSignOut,
 }: {
-  onSubmit: (topic: string) => void;
-  status: ReturnType<typeof useCourseGeneration>['status'];
-  error: ReturnType<typeof useCourseGeneration>['error'];
-  profile: AuthProfile;
+  profile: AuthProfile | null;
+  onGoToBuild: () => void;
+  onGoToLogin: () => void;
+  onGoToSignup: () => void;
   onSignOut: () => void;
 }) {
   return (
     <main className="home-page animate-fade-in-up">
       <header className="home-topbar">
         <div>
-          <div className="home-kicker">Signed in as {profile.provider === 'google' ? 'Google' : 'Email'}</div>
-          <p className="home-user">
-            {profile.name} · {profile.email}
-          </p>
+          <div className="home-kicker">AI course builder</div>
+          <p className="home-user">Build a guided learning path from any topic.</p>
         </div>
-        <button type="button" className="btn-ghost" onClick={onSignOut}>
-          Sign out
-        </button>
+        <div className="page-actions">
+          {profile ? (
+            <>
+              <button type="button" className="btn-ghost" onClick={onGoToBuild}>
+                Open builder
+              </button>
+              <button type="button" className="btn-ghost" onClick={onSignOut}>
+                Sign out
+              </button>
+            </>
+          ) : (
+            <>
+              <button type="button" className="btn-ghost" onClick={onGoToLogin}>
+                Login
+              </button>
+              <button type="button" className="btn-primary" onClick={onGoToSignup}>
+                Sign up
+              </button>
+            </>
+          )}
+        </div>
       </header>
 
       <section className="home-hero">
-        <div className="home-kicker">AI course builder</div>
         <h1 className="home-title">
           Turn any topic into a guided learning experience.
         </h1>
         <p className="home-copy">
-          Describe what you want to learn and the app assembles a course outline, lesson content,
-          relevant videos, and quizzes so you can start learning immediately.
+          Build a personalized course outline, lesson content, relevant videos, and quizzes in a
+          focused learning flow.
         </p>
 
         <div className="home-actions">
-          <a className="btn-primary home-primary-action" href="#topic-builder">
-            Start building
-          </a>
-          <p className="home-note">No setup. No blank page. Just a clear path to learn.</p>
+          <button type="button" className="btn-primary home-primary-action" onClick={onGoToBuild}>
+            Build your first AI-assisted course
+          </button>
+          <button type="button" className="btn-ghost" onClick={onGoToBuild}>
+            Start learning
+          </button>
         </div>
 
         <div className="home-highlights" aria-label="Key benefits">
@@ -263,14 +300,145 @@ function HomePage({
         </div>
       </section>
 
-      <section className="home-section home-builder" id="topic-builder">
+      <section className="home-section home-builder home-launchpad">
         <div className="section-heading-wrap section-heading-wrap--compact">
           <span className="section-heading-kicker">Get started</span>
-          <h2 className="section-heading-title">Build a course from a single topic</h2>
+          <h2 className="section-heading-title">Built to move you from idea to course faster</h2>
         </div>
 
-        <TopicInput onSubmit={onSubmit} status={status} error={error} />
+        <div className="launchpad-grid">
+          <div className="launchpad-copy">
+            <p>
+              Pick a topic, jump into the builder, and generate a structured learning path instead
+              of staring at a blank page.
+            </p>
+            <div className="home-actions home-actions--compact">
+              <button type="button" className="btn-primary home-primary-action" onClick={onGoToBuild}>
+                Build your first AI-assisted course
+              </button>
+              <button type="button" className="btn-ghost" onClick={onGoToBuild}>
+                Start learning
+              </button>
+            </div>
+          </div>
+
+          <div className="launchpad-card">
+            <div className="launchpad-stat">
+              <span>01</span>
+              <strong>Describe the topic</strong>
+            </div>
+            <div className="launchpad-stat">
+              <span>02</span>
+              <strong>Generate the learning path</strong>
+            </div>
+            <div className="launchpad-stat">
+              <span>03</span>
+              <strong>Learn lesson by lesson</strong>
+            </div>
+          </div>
+        </div>
       </section>
+    </main>
+  );
+}
+
+function BuildPage({
+  profile,
+  onGoHome,
+  onGoToLogin,
+  onGoToSignup,
+  onSignOut,
+  onSubmit,
+  status,
+  error,
+  courseData,
+  activeLessonIndex,
+  setActiveLessonIndex,
+  onReset,
+}: {
+  profile: AuthProfile | null;
+  onGoHome: () => void;
+  onGoToLogin: () => void;
+  onGoToSignup: () => void;
+  onSignOut: () => void;
+  onSubmit: (topic: string) => void;
+  status: ReturnType<typeof useCourseGeneration>['status'];
+  error: ReturnType<typeof useCourseGeneration>['error'];
+  courseData: ReturnType<typeof useCourseGeneration>['courseData'];
+  activeLessonIndex: number;
+  setActiveLessonIndex: (index: number) => void;
+  onReset: () => void;
+}) {
+  const isLoading =
+    status === 'generating_outline' ||
+    status === 'generating_lessons' ||
+    status === 'finding_videos' ||
+    status === 'generating_quizzes';
+
+  if (status === 'done' && courseData) {
+    return (
+      <CourseViewer
+        course={courseData}
+        activeLessonIndex={activeLessonIndex}
+        setActiveLessonIndex={setActiveLessonIndex}
+        onReset={onReset}
+      />
+    );
+  }
+
+  return (
+    <main className="home-page animate-fade-in-up">
+      <header className="home-topbar">
+        <div>
+          <div className="home-kicker">Course builder</div>
+          <p className="home-user">
+            {profile
+              ? `${profile.name} · ${profile.email}`
+              : 'Login or sign up to keep your learning flow saved locally.'}
+          </p>
+        </div>
+        <div className="page-actions">
+          <button type="button" className="btn-ghost" onClick={onGoHome}>
+            Home
+          </button>
+          {profile ? (
+            <button type="button" className="btn-ghost" onClick={onSignOut}>
+              Sign out
+            </button>
+          ) : (
+            <>
+              <button type="button" className="btn-ghost" onClick={onGoToLogin}>
+                Login
+              </button>
+              <button type="button" className="btn-primary" onClick={onGoToSignup}>
+                Sign up
+              </button>
+            </>
+          )}
+        </div>
+      </header>
+
+      <section className="home-hero">
+        <div className="home-kicker">Build your first AI-assisted course</div>
+        <h1 className="home-title">Describe one topic and get a course in return.</h1>
+        <p className="home-copy">
+          Start with a subject, then generate lessons, quizzes, and supporting videos in a single
+          flow.
+        </p>
+      </section>
+
+      {isLoading ? (
+        <GenerationProgress status={status} />
+      ) : (
+        <section className="home-section home-builder" id="topic-builder">
+          <div className="section-heading-wrap section-heading-wrap--compact">
+            <span className="section-heading-kicker">Get started</span>
+            <h2 className="section-heading-title">What do you want to learn?</h2>
+          </div>
+
+          <TopicInput onSubmit={onSubmit} status={status} error={error} />
+        </section>
+      )}
     </main>
   );
 }
@@ -286,35 +454,88 @@ function App() {
     resetCourse,
   } = useCourseGeneration();
   const [authProfile, setAuthProfile] = useState<AuthProfile | null>(null);
+  const [route, setRoute] = useState<AppRoute>(() => normalizeRoute(window.location.pathname));
 
-  const isLoading =
-    status === 'generating_outline' ||
-    status === 'generating_lessons' ||
-    status === 'finding_videos' ||
-    status === 'generating_quizzes';
+  const navigateTo = useCallback((nextRoute: AppRoute) => {
+    if (normalizeRoute(window.location.pathname) !== nextRoute) {
+      window.history.pushState({}, '', nextRoute);
+    }
+
+    setRoute(nextRoute);
+  }, []);
 
   useEffect(() => {
+    const handlePopState = () => {
+      setRoute(normalizeRoute(window.location.pathname));
+    };
+
+    window.addEventListener('popstate', handlePopState);
+
     const storedAuth = window.localStorage.getItem(AUTH_STORAGE_KEY);
 
-    if (!storedAuth) return;
-
-    try {
-      setAuthProfile(JSON.parse(storedAuth) as AuthProfile);
-    } catch {
-      window.localStorage.removeItem(AUTH_STORAGE_KEY);
+    if (storedAuth) {
+      try {
+        setAuthProfile(JSON.parse(storedAuth) as AuthProfile);
+      } catch {
+        window.localStorage.removeItem(AUTH_STORAGE_KEY);
+      }
     }
+
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
   }, []);
 
   const handleAuth = (profile: AuthProfile) => {
     setAuthProfile(profile);
     window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(profile));
+    navigateTo(ROUTES.BUILD);
   };
 
   const handleSignOut = () => {
     setAuthProfile(null);
     window.localStorage.removeItem(AUTH_STORAGE_KEY);
     resetCourse();
+    navigateTo(ROUTES.HOME);
   };
+
+  const handleCourseReset = () => {
+    resetCourse();
+    navigateTo(ROUTES.BUILD);
+  };
+
+  const content =
+    route === ROUTES.LOGIN || route === ROUTES.SIGNUP ? (
+      <AuthPage
+        mode={route === ROUTES.SIGNUP ? 'signup' : 'login'}
+        onAuth={handleAuth}
+        onGoHome={() => navigateTo(ROUTES.HOME)}
+        onGoOtherPage={() => navigateTo(route === ROUTES.LOGIN ? ROUTES.SIGNUP : ROUTES.LOGIN)}
+      />
+    ) : route === ROUTES.BUILD ? (
+      <BuildPage
+        profile={authProfile}
+        onGoHome={() => navigateTo(ROUTES.HOME)}
+        onGoToLogin={() => navigateTo(ROUTES.LOGIN)}
+        onGoToSignup={() => navigateTo(ROUTES.SIGNUP)}
+        onSignOut={handleSignOut}
+        onSubmit={generateCourse}
+        status={status}
+        error={error}
+        courseData={courseData}
+        activeLessonIndex={activeLessonIndex}
+        setActiveLessonIndex={setActiveLessonIndex}
+        onReset={handleCourseReset}
+      />
+    ) : (
+      <HomePage
+        profile={authProfile}
+        onGoToBuild={() => navigateTo(ROUTES.BUILD)}
+        onGoToLogin={() => navigateTo(ROUTES.LOGIN)}
+        onGoToSignup={() => navigateTo(ROUTES.SIGNUP)}
+        onSignOut={handleSignOut}
+      />
+    );
 
   return (
     <div className="app-container">
@@ -323,26 +544,7 @@ function App() {
       <div className="ambient-orb ambient-orb--left" />
       <div className="ambient-orb ambient-orb--right" />
 
-      {!authProfile ? (
-        <AuthPage onAuth={handleAuth} />
-      ) : status === 'done' && courseData ? (
-        <CourseViewer
-          course={courseData}
-          activeLessonIndex={activeLessonIndex}
-          setActiveLessonIndex={setActiveLessonIndex}
-          onReset={handleSignOut}
-        />
-      ) : isLoading ? (
-        <GenerationProgress status={status} />
-      ) : (
-        <HomePage
-          onSubmit={generateCourse}
-          status={status}
-          error={error}
-          profile={authProfile}
-          onSignOut={handleSignOut}
-        />
-      )}
+      {content}
     </div>
   );
 }
